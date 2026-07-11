@@ -5,9 +5,11 @@ import fs from "fs";
 const app = express();
 app.use(express.json());
 
-// Cắt khoảng trắng/xuống dòng thừa (tránh lỗi khi copy-paste biến môi trường
-// dính \r\n trên Windows -> "not a legal HTTP header value").
-const clean = (v) => (typeof v === "string" ? v.trim() : v);
+// Loại BỎ mọi ký tự không phải ASCII in được (khoảng trắng, \r, \n, ký tự ẩn...)
+// khỏi key/token — tránh lỗi "not a legal HTTP header value" khi copy-paste biến
+// môi trường dính ký tự rác (kể cả nằm giữa chuỗi). Key/token/ID đều thuần ASCII,
+// không có dấu cách hợp lệ, nên cắt sạch là an toàn.
+const clean = (v) => (typeof v === "string" ? v.replace(/[^\x21-\x7E]/g, "") : v);
 const WHATSAPP_TOKEN = clean(process.env.WHATSAPP_TOKEN);     // token truy cập từ Meta
 const PHONE_NUMBER_ID = clean(process.env.PHONE_NUMBER_ID);   // ID số WhatsApp (từ Meta)
 const VERIFY_TOKEN = clean(process.env.VERIFY_TOKEN);         // chuỗi tùy ý mình đặt, verify webhook
@@ -143,7 +145,7 @@ app.get("/debug", (req, res) => {
 // Tự-test: gọi thử Claude từ chính Railway để chẩn đoán kết nối ra ngoài.
 app.get("/debug/ping", async (req, res) => {
   if (req.query.token !== VERIFY_TOKEN) return res.sendStatus(403);
-  const out = { hasKey: !!ANTHROPIC_API_KEY, keyPrefix: (ANTHROPIC_API_KEY || "").slice(0, 12) };
+  const out = { version: "sanitize-v2", hasKey: !!ANTHROPIC_API_KEY, keyLen: (ANTHROPIC_API_KEY || "").length };
   try {
     const r = await anthropic.messages.create({
       model: MODEL, max_tokens: 10, messages: [{ role: "user", content: "ping" }],
