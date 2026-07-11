@@ -5,13 +5,14 @@ import fs from "fs";
 const app = express();
 app.use(express.json());
 
-const {
-  WHATSAPP_TOKEN,     // token truy cập từ Meta
-  PHONE_NUMBER_ID,    // ID số WhatsApp (từ Meta)
-  VERIFY_TOKEN,       // chuỗi tùy ý mình đặt, dùng khi verify webhook
-  ANTHROPIC_API_KEY,  // API key Claude
-  PORT = 3000,
-} = process.env;
+// Cắt khoảng trắng/xuống dòng thừa (tránh lỗi khi copy-paste biến môi trường
+// dính \r\n trên Windows -> "not a legal HTTP header value").
+const clean = (v) => (typeof v === "string" ? v.trim() : v);
+const WHATSAPP_TOKEN = clean(process.env.WHATSAPP_TOKEN);     // token truy cập từ Meta
+const PHONE_NUMBER_ID = clean(process.env.PHONE_NUMBER_ID);   // ID số WhatsApp (từ Meta)
+const VERIFY_TOKEN = clean(process.env.VERIFY_TOKEN);         // chuỗi tùy ý mình đặt, verify webhook
+const ANTHROPIC_API_KEY = clean(process.env.ANTHROPIC_API_KEY); // API key Claude
+const PORT = process.env.PORT || 3000;
 
 const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 const MODEL = "claude-haiku-4-5-20251001"; // model rẻ nhất, hợp chatbot
