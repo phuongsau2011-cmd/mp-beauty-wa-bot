@@ -110,14 +110,26 @@ app.post("/webhook", async (req, res) => {
     const from = msg.from;          // số điện thoại khách
     const text = msg.text.body;     // nội dung khách nhắn
     logEvent({ kind: "message-in", from, text });
-    const reply = await askClaude(from, text);
+
+    let reply;
+    try {
+      reply = await askClaude(from, text);
+    } catch (e) {
+      logEvent({ kind: "claude-error", name: e?.name, status: e?.status, message: String(e?.message || e).slice(0, 150), cause: String(e?.cause?.code || e?.cause?.message || "").slice(0, 120) });
+      throw e;
+    }
+
     if (reply) {
-      await sendWhatsApp(from, reply);
-      logEvent({ kind: "reply-sent", from, reply: reply.slice(0, 80) });
+      try {
+        await sendWhatsApp(from, reply);
+        logEvent({ kind: "reply-sent", from, reply: reply.slice(0, 80) });
+      } catch (e) {
+        logEvent({ kind: "whatsapp-send-error", message: String(e?.message || e).slice(0, 150), cause: String(e?.cause?.code || "").slice(0, 120) });
+        throw e;
+      }
     }
   } catch (e) {
     console.error("Handler error:", e);
-    logEvent({ kind: "error", message: String(e?.message || e).slice(0, 200) });
   }
 });
 
