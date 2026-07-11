@@ -86,21 +86,45 @@ app.get("/webhook", (req, res) => {
   res.sendStatus(403);
 });
 
+// Bộ đệm sự kiện gần đây để chẩn đoán (chỉ trong RAM, tối đa 20).
+const recentEvents = [];
+function logEvent(ev) {
+  recentEvents.push({ t: new Date().toISOString(), ...ev });
+  if (recentEvents.length > 20) recentEvents.shift();
+  console.log("[webhook]", JSON.stringify(ev));
+}
+
 // --- Nhận tin nhắn đến ---
 app.post("/webhook", async (req, res) => {
   res.sendStatus(200); // trả 200 ngay để Meta không gửi lại
   try {
     const value = req.body?.entry?.[0]?.changes?.[0]?.value;
     const msg = value?.messages?.[0];
-    if (!msg || msg.type !== "text") return; // MVP: chỉ xử lý tin text
+    if (!msg) {
+      // status update (sent/delivered/read) hoặc payload khác — ghi lại để debug
+      logEvent({ kind: value?.statuses ? "status:" + value.statuses[0].status : "non-message" });
+      return;
+    }
+    if (msg.type !== "text") { logEvent({ kind: "non-text", type: msg.type }); return; }
 
     const from = msg.from;          // số điện thoại khách
     const text = msg.text.body;     // nội dung khách nhắn
+    logEvent({ kind: "message-in", from, text });
     const reply = await askClaude(from, text);
-    if (reply) await sendWhatsApp(from, reply);
+    if (reply) {
+      await sendWhatsApp(from, reply);
+      logEvent({ kind: "reply-sent", from, reply: reply.slice(0, 80) });
+    }
   } catch (e) {
     console.error("Handler error:", e);
+    logEvent({ kind: "error", message: String(e?.message || e).slice(0, 200) });
   }
+});
+
+// Endpoint debug: xem sự kiện gần đây. Bảo vệ bằng verify token.
+app.get("/debug", (req, res) => {
+  if (req.query.token !== VERIFY_TOKEN) return res.sendStatus(403);
+  res.json({ count: recentEvents.length, events: recentEvents });
 });
 
 app.get("/", (_, res) => res.send("MP Beauty WhatsApp bot is running."));
