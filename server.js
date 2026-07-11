@@ -89,12 +89,9 @@ app.get("/webhook", (req, res) => {
   res.sendStatus(403);
 });
 
-// Bộ đệm sự kiện gần đây để chẩn đoán (chỉ trong RAM, tối đa 20).
-const recentEvents = [];
+// Ghi log sự kiện webhook ra stdout (xem trong Railway → Logs).
 function logEvent(ev) {
-  recentEvents.push({ t: new Date().toISOString(), ...ev });
-  if (recentEvents.length > 20) recentEvents.shift();
-  console.log("[webhook]", JSON.stringify(ev));
+  console.log("[webhook]", new Date().toISOString(), JSON.stringify(ev));
 }
 
 // --- Nhận tin nhắn đến ---
@@ -134,40 +131,6 @@ app.post("/webhook", async (req, res) => {
   } catch (e) {
     console.error("Handler error:", e);
   }
-});
-
-// Endpoint debug: xem sự kiện gần đây. Bảo vệ bằng verify token.
-app.get("/debug", (req, res) => {
-  if (req.query.token !== VERIFY_TOKEN) return res.sendStatus(403);
-  res.json({ count: recentEvents.length, events: recentEvents });
-});
-
-// Tự-test: gọi thử Claude từ chính Railway để chẩn đoán kết nối ra ngoài.
-app.get("/debug/ping", async (req, res) => {
-  if (req.query.token !== VERIFY_TOKEN) return res.sendStatus(403);
-  const out = {
-    version: "sanitize-v3",
-    lengths: {
-      ANTHROPIC_API_KEY: (ANTHROPIC_API_KEY || "").length,   // đúng: 108
-      WHATSAPP_TOKEN: (WHATSAPP_TOKEN || "").length,          // đúng: 199
-      PHONE_NUMBER_ID: (PHONE_NUMBER_ID || "").length,        // đúng: 16
-      VERIFY_TOKEN: (VERIFY_TOKEN || "").length,              // đúng: 41
-    },
-  };
-  try {
-    const r = await anthropic.messages.create({
-      model: MODEL, max_tokens: 10, messages: [{ role: "user", content: "ping" }],
-    });
-    out.ok = true;
-    out.reply = r.content.map((b) => b.text).join("");
-  } catch (e) {
-    out.ok = false;
-    out.name = e?.name;
-    out.status = e?.status;
-    out.message = String(e?.message || e).slice(0, 200);
-    out.cause = String(e?.cause?.code || e?.cause?.message || "").slice(0, 150);
-  }
-  res.json(out);
 });
 
 app.get("/", (_, res) => res.send("MP Beauty WhatsApp bot is running."));
