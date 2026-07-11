@@ -145,7 +145,15 @@ app.get("/debug", (req, res) => {
 // Tự-test: gọi thử Claude từ chính Railway để chẩn đoán kết nối ra ngoài.
 app.get("/debug/ping", async (req, res) => {
   if (req.query.token !== VERIFY_TOKEN) return res.sendStatus(403);
-  const out = { version: "sanitize-v2", hasKey: !!ANTHROPIC_API_KEY, keyLen: (ANTHROPIC_API_KEY || "").length };
+  const out = {
+    version: "sanitize-v3",
+    lengths: {
+      ANTHROPIC_API_KEY: (ANTHROPIC_API_KEY || "").length,   // đúng: 108
+      WHATSAPP_TOKEN: (WHATSAPP_TOKEN || "").length,          // đúng: 199
+      PHONE_NUMBER_ID: (PHONE_NUMBER_ID || "").length,        // đúng: 16
+      VERIFY_TOKEN: (VERIFY_TOKEN || "").length,              // đúng: 41
+    },
+  };
   try {
     const r = await anthropic.messages.create({
       model: MODEL, max_tokens: 10, messages: [{ role: "user", content: "ping" }],
