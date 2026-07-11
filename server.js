@@ -139,5 +139,25 @@ app.get("/debug", (req, res) => {
   res.json({ count: recentEvents.length, events: recentEvents });
 });
 
+// Tự-test: gọi thử Claude từ chính Railway để chẩn đoán kết nối ra ngoài.
+app.get("/debug/ping", async (req, res) => {
+  if (req.query.token !== VERIFY_TOKEN) return res.sendStatus(403);
+  const out = { hasKey: !!ANTHROPIC_API_KEY, keyPrefix: (ANTHROPIC_API_KEY || "").slice(0, 12) };
+  try {
+    const r = await anthropic.messages.create({
+      model: MODEL, max_tokens: 10, messages: [{ role: "user", content: "ping" }],
+    });
+    out.ok = true;
+    out.reply = r.content.map((b) => b.text).join("");
+  } catch (e) {
+    out.ok = false;
+    out.name = e?.name;
+    out.status = e?.status;
+    out.message = String(e?.message || e).slice(0, 200);
+    out.cause = String(e?.cause?.code || e?.cause?.message || "").slice(0, 150);
+  }
+  res.json(out);
+});
+
 app.get("/", (_, res) => res.send("MP Beauty WhatsApp bot is running."));
 app.listen(PORT, () => console.log(`Listening on :${PORT}`));
